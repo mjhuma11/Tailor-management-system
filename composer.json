@@ -1,0 +1,15 @@
+{
+    "name": "wdpf/the-stitch-house",
+    "autoload": {
+        "psr-4": {
+            "Wdpf\\TheStitchHouse\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Mahmuda-Jhuma",
+            "email": "mjhumu611@gmail.com"
+        }
+    ],
+    "require": {}
+}
