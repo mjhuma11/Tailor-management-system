@@ -104,8 +104,8 @@ $flashMessage = getFlashMessage();
                             </div>
                         <?php else: ?>
                             <!-- Not logged in - show login/register buttons -->
-                            <a href="login.html" class="btn btn-outline-primary me-2">Login</a>
-                            <a href="register.html" class="btn btn-primary">Register</a>
+                            <a href="login.php" class="btn btn-outline-primary me-2">Login</a>
+                            <a href="register.php" class="btn btn-primary">Register</a>
                         <?php endif; ?>
                     </div>
                 </div>

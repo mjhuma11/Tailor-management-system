@@ -1,3 +1,16 @@
+<?php
+session_start();
+
+// Get flash message
+$flashMessage = null;
+if (isset($_SESSION['flash_message'])) {
+    $flashMessage = [
+        'text' => $_SESSION['flash_message'],
+        'type' => $_SESSION['flash_type'] ?? 'info'
+    ];
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -40,7 +53,16 @@
     <section class="login-section py-5">
         <div class="container">
             <!-- Flash Messages -->
-            <div id="flashMessages"></div>
+            <?php if ($flashMessage): ?>
+                <div class="row justify-content-center mb-3">
+                    <div class="col-lg-5 col-md-7">
+                        <div class="alert alert-<?= $flashMessage['type'] === 'error' ? 'danger' : $flashMessage['type'] ?> alert-dismissible fade show">
+                            <?= htmlspecialchars($flashMessage['text']) ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
             
             <div class="row justify-content-center">
                 <div class="col-lg-5 col-md-7">
@@ -49,7 +71,7 @@
                             <h2 class="login-title">Welcome Back</h2>
                             <p class="text-muted">Sign in to your account</p>
                             <p class="mb-0">Don't have an account? 
-                                <a href="register.html" class="text-decoration-none fw-bold text-primary">
+                                <a href="register.php" class="text-decoration-none fw-bold text-primary">
                                     Sign Up
                                 </a>
                             </p>
@@ -103,7 +125,7 @@
 
                             <div class="text-center">
                                 <p class="mb-0">Don't have an account?
-                                    <a href="register.html" class="text-decoration-none fw-bold text-primary">
+                                    <a href="register.php" class="text-decoration-none fw-bold text-primary">
                                         Sign Up
                                     </a>
                                 </p>
@@ -154,31 +176,11 @@
     <!-- Custom JS -->
     <script>
         $(document).ready(function () {
-            // Check for flash messages from PHP session
-            <?php
-            session_start();
-            if (isset($_SESSION['flash_message'])) {
-                $type = $_SESSION['flash_type'] === 'error' ? 'danger' : $_SESSION['flash_type'];
-                echo "showFlashMessage('" . addslashes($_SESSION['flash_message']) . "', '$type');";
-                unset($_SESSION['flash_message'], $_SESSION['flash_type']);
-            }
-            ?>
+            // Auto-dismiss alerts after 5 seconds
+            setTimeout(function() {
+                $('.alert').fadeOut();
+            }, 5000);
             
-            // Function to show flash messages
-            function showFlashMessage(message, type) {
-                const alertHtml = `
-                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                        ${message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                `;
-                $('#flashMessages').html(alertHtml);
-                
-                // Auto-dismiss after 5 seconds
-                setTimeout(function() {
-                    $('.alert').fadeOut();
-                }, 5000);
-            }
             // Toggle password visibility
             $('#togglePassword').on('click', function () {
                 const passwordField = $('#password');

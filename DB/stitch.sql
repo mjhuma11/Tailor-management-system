@@ -1,7 +1,6 @@
 -- Create Database
 CREATE DATABASE IF NOT EXISTS `stitch` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `
-`;
+USE `stitch`;
 
 -- --------------------------------------------------------
 -- Table structure for table `users`

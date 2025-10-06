@@ -1,3 +1,16 @@
+<?php
+session_start();
+
+// Get flash message
+$flashMessage = null;
+if (isset($_SESSION['flash_message'])) {
+    $flashMessage = [
+        'text' => $_SESSION['flash_message'],
+        'type' => $_SESSION['flash_type'] ?? 'info'
+    ];
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -39,13 +52,29 @@
     <!-- Register Section -->
     <section class="register-section py-5">
         <div class="container">
+            <!-- Flash Messages -->
+            <?php if ($flashMessage): ?>
+                <div class="row justify-content-center mb-3">
+                    <div class="col-lg-6 col-md-8">
+                        <div class="alert alert-<?= $flashMessage['type'] === 'error' ? 'danger' : $flashMessage['type'] ?> alert-dismissible fade show">
+                            <?= htmlspecialchars($flashMessage['text']) ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
             <div class="row justify-content-center">
                 <div class="col-lg-6 col-md-8">
                     <div class="register-card">
                         <div class="text-center mb-4">
                             <h2 class="register-title">Create Account</h2>
                             <p class="text-muted">Join The Stitch House family</p>
-
+                            <p class="mb-0">Already have an account? 
+                                <a href="login.php" class="text-decoration-none fw-bold text-primary">
+                                    Sign In
+                                </a>
+                            </p>
                         </div>
 
                         <form id="registerForm" action="backend/register.php" method="POST">
@@ -165,7 +194,7 @@
 
                             <div class="text-center">
                                 <p class="mb-0">Already have an account?
-                                    <a href="login.html" class="text-decoration-none fw-bold text-primary">
+                                    <a href="login.php" class="text-decoration-none fw-bold text-primary">
                                         Sign In
                                     </a>
                                 </p>
@@ -216,6 +245,11 @@
     <!-- Custom JS -->
     <script>
         $(document).ready(function () {
+            // Auto-dismiss alerts after 5 seconds
+            setTimeout(function() {
+                $('.alert').fadeOut();
+            }, 5000);
+            
             // Toggle password visibility
             $('#togglePassword').on('click', function () {
                 const passwordField = $('#password');

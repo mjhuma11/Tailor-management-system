@@ -105,7 +105,7 @@ function getCurrentCustomer($pdo) {
     }
     
     try {
-        $stmt = $pdo->prepare("SELECT id, fullname, email, phone, status FROM customer WHERE id = ? AND status = 'active'");
+        $stmt = $pdo->prepare("SELECT id, fullname, email, phone, gender, address, customer_code, status FROM customer WHERE id = ? AND status = 'active'");
         $stmt->execute([$_SESSION['customer_id']]);
         return $stmt->fetch();
     } catch(PDOException $e) {

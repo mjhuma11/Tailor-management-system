@@ -73,6 +73,8 @@ $flashMessage = getFlashMessage();
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="customer-dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <li><a class="dropdown-item" href="customer-measurements.php"><i class="fas fa-ruler-combined"></i> My Measurements</a></li>
+                        <li><a class="dropdown-item" href="upload-measurements.php"><i class="fas fa-upload"></i> Upload Measurements</a></li>
                         <li><a class="dropdown-item" href="my-orders.php"><i class="fas fa-shopping-bag"></i> My Orders</a></li>
                         <li><a class="dropdown-item" href="my-profile.php"><i class="fas fa-user"></i> My Profile</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -163,6 +165,34 @@ $flashMessage = getFlashMessage();
                                 <?= count(array_filter($orders, function($o) { return $o['order_status'] === 'delivered'; })) ?>
                             </h5>
                             <p class="card-text text-muted">Delivered</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Measurement Actions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card bg-gradient" style="background: linear-gradient(45deg, #28a745, #20c997);">
+                        <div class="card-body text-white">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="card-title mb-2">
+                                        <i class="fas fa-ruler-combined"></i> Measurement Center
+                                    </h5>
+                                    <p class="card-text mb-0">
+                                        Submit your measurements for the perfect fit. Choose from manual entry or file upload.
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <a href="customer-measurements.php" class="btn btn-light me-2">
+                                        <i class="fas fa-keyboard"></i> Enter Measurements
+                                    </a>
+                                    <a href="upload-measurements.php" class="btn btn-outline-light">
+                                        <i class="fas fa-upload"></i> Upload File
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

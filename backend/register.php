@@ -1,14 +1,81 @@
 <?php
+
 /**
- * Customer Registration Handler
+ * Customer Registration Handler with MySQLi
  * The Stitch House - Customer Registration Backend
  */
 
-require_once 'config.php';
+// Start session
+session_start();
+
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_NAME', 'stitch');
+
+// Create MySQLi connection
+$mysqli = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+
+// Check connection
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error);
+}
+
+// Set charset to utf8mb4
+$mysqli->set_charset("utf8mb4");
+
+/**
+ * Helper Functions
+ */
+
+// Sanitize input data
+function sanitize($data)
+{
+    global $mysqli;
+    return $mysqli->real_escape_string(htmlspecialchars(strip_tags(trim($data))));
+}
+
+// Validate email format
+function isValidEmail($email)
+{
+    return filter_var($email, FILTER_VALIDATE_EMAIL);
+}
+
+// Validate phone number
+function isValidPhone($phone)
+{
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+    return strlen($phone) >= 10;
+}
+
+// Generate customer code
+function generateCustomerCode($mysqli)
+{
+    do {
+        $code = 'CUST' . date('Y') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        $stmt = $mysqli->prepare("SELECT id FROM customer WHERE customer_code = ?");
+        $stmt->bind_param("s", $code);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stmt->close();
+    } while ($result->num_rows > 0);
+
+    return $code;
+}
+
+// Redirect with message
+function redirectWithMessage($url, $message, $type = 'success')
+{
+    $_SESSION['flash_message'] = $message;
+    $_SESSION['flash_type'] = $type;
+    header("Location: $url");
+    exit();
+}
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirectWithMessage('../register.html', 'Invalid request method.', 'error');
+    redirectWithMessage('../register.php', 'Invalid request method.', 'error');
 }
 
 // Get and sanitize form data
@@ -64,98 +131,109 @@ if ($password !== $confirmPassword) {
     $errors[] = 'Passwords do not match.';
 }
 
+// Gender validation
+$validGenders = ['Male', 'Female', 'Other', 'male', 'female', 'other'];
+if (!empty($gender) && !in_array($gender, $validGenders)) {
+    $errors[] = 'Please select a valid gender.';
+}
+
+// Normalize gender to proper case
+if (!empty($gender)) {
+    $gender = ucfirst(strtolower($gender));
+}
+
 // Terms validation
 if (!$terms) {
     $errors[] = 'You must accept the Terms & Conditions.';
 }
 
-// Gender validation
-if (!in_array($gender, ['Male', 'Female', 'Other'])) {
-    $errors[] = 'Please select a valid gender.';
-}
-
 // If there are validation errors, redirect back with errors
 if (!empty($errors)) {
     $errorMessage = implode(' ', $errors);
-    redirectWithMessage('../register.html', $errorMessage, 'error');
+    redirectWithMessage('../register.php', $errorMessage, 'error');
 }
 
 try {
     // Check if username already exists in users table
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-    $stmt->execute([$username]);
-    if ($stmt->fetch()) {
-        redirectWithMessage('../register.html', 'This username is already taken. Please choose a different username.', 'error');
+    $stmt = $mysqli->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $stmt->close();
+        redirectWithMessage('../register.php', 'This username is already taken. Please choose a different username.', 'error');
     }
-    
+    $stmt->close();
+
     // Check if email already exists in users table
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    if ($stmt->fetch()) {
-        redirectWithMessage('../register.html', 'An account with this email address already exists.', 'error');
+    $stmt = $mysqli->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $stmt->close();
+        redirectWithMessage('../register.php', 'An account with this email address already exists.', 'error');
     }
-    
+    $stmt->close();
+
     // Check if phone already exists in customer table
     $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-    $stmt = $pdo->prepare("SELECT id FROM customer WHERE phone LIKE ?");
-    $stmt->execute(["%$cleanPhone%"]);
-    if ($stmt->fetch()) {
-        redirectWithMessage('../register.html', 'An account with this phone number already exists.', 'error');
+    $phonePattern = "%$cleanPhone%";
+    $stmt = $mysqli->prepare("SELECT id FROM customer WHERE phone LIKE ?");
+    $stmt->bind_param("s", $phonePattern);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $stmt->close();
+        redirectWithMessage('../register.php', 'An account with this phone number already exists.', 'error');
     }
-    
+    $stmt->close();
+
     // Generate customer code
-    $customerCode = generateCustomerCode($pdo);
-    
+    $customerCode = generateCustomerCode($mysqli);
+
     // Hash password
     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    
-    // Insert new customer in customer table
-    $stmt = $pdo->prepare("
-        INSERT INTO customer (
-            fullname, email, phone, address, gender, 
-            customer_code, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW(), NOW())
-    ");
-    
-    $stmt->execute([
-        $fullname,
-        $email,
-        $phone,
-        $address,
-        $gender,
-        $customerCode
-    ]);
-    
-    $customerId = $pdo->lastInsertId();
-    
-    // Insert user in users table with customer role (default)
-    $stmt = $pdo->prepare("
+
+    // Start transaction
+    $mysqli->autocommit(FALSE);
+
+    // Insert user in users table first
+    $stmt = $mysqli->prepare("
         INSERT INTO users (
-            name, email, username, password, phone, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'active', NOW(), NOW())
+            name, email, username, password, phone, role, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'customer', 'active', NOW(), NOW())
     ");
-    
-    // Generate unique username from email
-    $username = explode('@', $email)[0] . '_' . $customerId;
-    
-    $stmt->execute([
-        $fullname,
-        $email,
-        $username,
-        $hashedPassword,
-        $phone
-    ]);
-    
-    $userId = $pdo->lastInsertId();
-    
-    // Link customer to user account
-    $stmt = $pdo->prepare("UPDATE customer SET user_id = ? WHERE id = ?");
-    $stmt->execute([$userId, $customerId]);
-    
-    // If newsletter subscription is checked, add to newsletter list (optional)
+    $stmt->bind_param("sssss", $fullname, $email, $username, $hashedPassword, $phone);
+
+    if (!$stmt->execute()) {
+        throw new Exception("Error creating user account: " . $stmt->error);
+    }
+
+    $userId = $mysqli->insert_id;
+    $stmt->close();
+
+    // Insert customer record
+    $stmt = $mysqli->prepare("
+        INSERT INTO customer (
+            user_id, fullname, email, phone, address, gender, 
+            customer_code, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW(), NOW())
+    ");
+    $stmt->bind_param("issssss", $userId, $fullname, $email, $phone, $address, $gender, $customerCode);
+
+    if (!$stmt->execute()) {
+        throw new Exception("Error creating customer record: " . $stmt->error);
+    }
+
+    $customerId = $mysqli->insert_id;
+    $stmt->close();
+
+    // If newsletter subscription is checked, add to newsletter list
     if ($newsletter) {
         try {
-            $pdo->exec("
+            // Create newsletter table if it doesn't exist
+            $mysqli->query("
                 CREATE TABLE IF NOT EXISTS newsletter_subscribers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     customer_id INT NULL,
@@ -166,32 +244,57 @@ try {
                     UNIQUE KEY unique_email (email)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
-            
-            $stmt = $pdo->prepare("
+
+            $stmt = $mysqli->prepare("
                 INSERT INTO newsletter_subscribers (customer_id, email, status, subscribed_at) 
                 VALUES (?, ?, 'active', NOW())
                 ON DUPLICATE KEY UPDATE 
                 status = 'active', 
                 customer_id = VALUES(customer_id)
             ");
-            $stmt->execute([$customerId, $email]);
+            $stmt->bind_param("is", $customerId, $email);
+            $stmt->execute();
+            $stmt->close();
         } catch (Exception $e) {
             // Newsletter subscription failed, but don't stop registration
             error_log("Newsletter subscription failed: " . $e->getMessage());
         }
     }
-    
+
+    // Commit transaction
+    $mysqli->commit();
+    $mysqli->autocommit(TRUE);
+
     // Log the registration
-    error_log("New customer registered: User ID $userId, Customer ID $customerId, Email: $email, Name: $fullname");
-    
+    error_log("New customer registered: User ID $userId, Customer ID $customerId, Email: $email, Username: $username");
+
     // Redirect to login page after successful registration
-    redirectWithMessage('../login.html', 'Registration successful! Please log in with your new account.', 'success');
-    
-} catch (PDOException $e) {
-    error_log("Registration error: " . $e->getMessage());
-    redirectWithMessage('../register.html', 'Registration failed. Please try again later.', 'error');
+    redirectWithMessage('../login.php', 'Registration successful! Please log in with your new account.', 'success');
 } catch (Exception $e) {
+    // Rollback transaction on error
+    $mysqli->rollback();
+    $mysqli->autocommit(TRUE);
+
+    // Log detailed error information
     error_log("Registration error: " . $e->getMessage());
-    redirectWithMessage('../register.html', 'An unexpected error occurred. Please try again.', 'error');
+    error_log("Registration error details - Username: $username, Email: $email, Phone: $phone");
+    
+    // Show more specific error message in development
+    $errorMessage = 'Registration failed. ';
+    if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+        if (strpos($e->getMessage(), 'email') !== false) {
+            $errorMessage .= 'Email address already exists.';
+        } elseif (strpos($e->getMessage(), 'username') !== false) {
+            $errorMessage .= 'Username already exists.';
+        } else {
+            $errorMessage .= 'Duplicate information found.';
+        }
+    } else {
+        $errorMessage .= 'Please check your information and try again.';
+    }
+    
+    redirectWithMessage('../register.php', $errorMessage, 'error');
 }
-?>
+
+// Close connection
+$mysqli->close();
